@@ -169,6 +169,20 @@ var ECOLS = ['#d4cc48','#4a88e0','#58a8e8','#50d8c0','#e08840','#e070a0','#90d04
 var CARS = [], PLCAR, k0;
 for (k0 = 0; k0 < ECOLS.length; k0++) CARS.push(makeCar(ECOLS[k0]));
 PLCAR = makeCar('#f4f4f4');
+var ICONCAR = makeCar('#000000');
+
+/* in-game clock: maps the day cycle (0..1) to hours, so the HUD shows morning / evening / night */
+var CLK = [[0, 7], [0.46, 18], [0.58, 20], [0.80, 27], [0.92, 29.5], [1, 31]];
+function clockStr(u){
+  var i = 0, h;
+  while (i < CLK.length - 2 && u >= CLK[i + 1][0]) i++;
+  var a = CLK[i], b = CLK[i + 1];
+  h = a[1] + (b[1] - a[1]) * clamp((u - a[0]) / (b[0] - a[0]), 0, 1);
+  h = h % 24;
+  var hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
+  return pad(hh, 2) + ':' + pad(mm, 2);
+}
+function sndX(){ return isLand ? W - 34 : W - 4; }
 
 /* ---------- low flat hills on the horizon ---------- */
 var PN = 1024, PROF = [];
@@ -388,7 +402,7 @@ function tapAt(clientX, clientY){
   var r = cv.getBoundingClientRect();
   var cx = (clientX - r.left) / r.width * W;
   var cy = (clientY - r.top) / r.height * H;
-  if (cx > W - 36 && cy < TOPPAD + 22){ toggleMute(); return; }
+  if (cx > sndX() - 32 && cy < TOPPAD + 22){ toggleMute(); return; }
   if (state === 'title'){ startGame(); return; }
   if (state === 'play') steer(cx < W / 2 ? -1 : 1);
   else steer(0);
@@ -603,11 +617,8 @@ function drawPlayer(n, bodyA){
   }
 }
 function drawIcon(x, y){
-  var rows = ['.XXXXX.', 'XXXXXXX', 'XXXXXXX', 'X.XXX.X', 'X.....X'];
-  ctx.fillStyle = '#000';
-  for (var r = 0; r < 5; r++){
-    for (var c = 0; c < 7; c++) if (rows[r].charAt(c) === 'X') R(x + c * 2, y + r * 2, 2, 2);
-  }
+  /* the little race car next to the counter: same sprite as the cars on the road */
+  SPRD(ICONCAR, x, y, 15, 15 * 13 / 32);
 }
 function drawHUD(){
   var py = roadBottom;
@@ -618,7 +629,7 @@ function drawHUD(){
   /* odometer strip */
   var sx0 = bx + 16, sw = 99, sy0 = by + 4, sh = 13;
   ctx.fillStyle = OR; R(sx0, sy0, sw, sh);
-  var od = pad(Math.floor(odo * 10), 5); if (od.length > 5) od = od.slice(-5);
+  var od = clockStr(clamp(dayT / DAYLEN, 0, 1));
   var dw = 16, total = 5 * dw - 4, xd = sx0 + sw - 3 - total, lastX = xd + 4 * dw;
   txtXY(od.substr(0, 4), xd, sy0 + 1.5, 4, 2, BK);
   ctx.fillStyle = BK; R(lastX - 3, sy0, sx0 + sw - (lastX - 3), sh);
@@ -629,11 +640,11 @@ function drawHUD(){
   var ds = String(day), dsx = ds.length > 1 ? 2 : 4;
   txtXY(ds, bx + 16 + (17 - (ds.length * 4 * dsx - dsx)) / 2, ry + 1.5, dsx, 2, BK);
   ctx.fillStyle = OR; R(bx + 49, ry, 66, 13);
-  drawIcon(bx + 53, ry + 1.5);
+  drawIcon(bx + 52, ry + 3.5);
   txtXY(pad(carsLeft, 3), bx + 49 + 66 - 3 - 44, ry + 1.5, 4, 2, BK);
   /* label */
-  if (isLand) txt('ENDURO', 8, by + 14, 2, '#dcdcdc');
-  else txt('ENDURO', 8, by + BH + 7, 2, '#dcdcdc');
+  var lx = isLand ? 28 : 8, lsc = (!isLand || bx - lx - 6 >= 78) ? 2 : 1;
+  txt('ENG. ISLAM', lx, isLand ? by + 14 : by + BH + 7, lsc, '#dcdcdc');
 }
 
 function render(){
@@ -733,7 +744,7 @@ function render(){
 
   /* ---------- HUD ---------- */
   drawHUD();
-  txtS('SND', W - 4, TOPPAD + 2, 2, muted ? '#707078' : '#ffffff', 'r');
+  txtS('SND', sndX(), TOPPAD + 2, 2, muted ? '#707078' : '#ffffff', 'r');
 
   if (banner && state === 'play'){
     var ba = banner.t < 0.5 ? banner.t / 0.5 : 1;
